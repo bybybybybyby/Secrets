@@ -43,7 +43,8 @@ mongoose.set("useCreateIndex", true); // Deprecation warning fix
 const userSchema = new mongoose.Schema({
   email: String,
   password: String,
-  googleId: String
+  googleId: String,
+  secret: String
 });
 
 userSchema.plugin(passportLocalMongoose);
@@ -81,15 +82,16 @@ passport.use(new GoogleStrategy({
 ));
 
 
-
 app.get("/", function(req, res) {
   res.render("home");
 });
+
 
 // Specifying the 'google' strategy to authenticate requests
 app.get("/auth/google",
   passport.authenticate('google', { scope: ["profile"] })
 );
+
 
 // After authentication from Google, redirect to our authorized redirect URI
 app.get("/auth/google/secrets",
@@ -99,22 +101,61 @@ app.get("/auth/google/secrets",
     res.redirect("/secrets");
   });
 
+
 app.get("/login", function(req, res) {
   res.render("login");
 });
+
 
 app.get("/register", function(req, res) {
   res.render("register");
 });
 
 
+// Find all users where "secret" value is not equal to null.
 app.get("/secrets", function(req, res) {
+  User.find({"secret": {$ne: null}}, function(err, foundUsers) {
+    if (err) {
+      console.log(err);
+    } else {
+      if (foundUsers) {
+        res.render("secrets", {usersWithSecrets: foundUsers});
+      }
+    }
+  });
+});;
+
+
+app.get("/submit", function(req, res) {
   if (req.isAuthenticated()) {
-    res.render("secrets");
+    res.render("submit");
   } else {
     res.redirect("/login");
   }
 });
+
+
+// Save the input secret to the current user in database
+app.post("/submit", function(req, res) {
+  const submittedSecret = req.body.secret;
+
+  // Find current user. Passport saves user details into the req.user variable.
+  console.log(req.user);
+
+  User.findById(req.user.id, function(err, foundUser) {
+    if (err) {
+      console.log(err);
+    } else {
+      if (foundUser) {
+        foundUser.secret = submittedSecret;
+        foundUser.save(function() {
+          res.redirect("/secrets");
+        });
+      }
+    }
+  });
+});
+
 
 app.get("/logout", function(req, res) {
   req.logout();
@@ -158,6 +199,27 @@ app.post("/login", function(req, res) {
 app.listen(port, () => {
   console.log(`Server started on port ${port}`);
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
